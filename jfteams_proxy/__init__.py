@@ -10,11 +10,16 @@ from uuid import uuid4
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from requests import put, get
+from fastapi.middleware.cors import CORSMiddleware
 
 
 def create_app() -> FastAPI:
     app = FastAPI()
-
+    app.add_middleware(CORSMiddleware,
+                       allow_origins=["*"],
+                       allow_credentials=True,
+                       allow_methods=["*"],
+                       allow_headers=["*"])
     redis = Redis.from_url(getenv("REDIS_URL", "redis://127.0.0.1:6379"))
 
     @app.get("/ping")
