@@ -107,7 +107,7 @@ def create_app() -> FastAPI:
         app_key, poll_id = credentials.decode("utf-8").split(
             "-")  # Get back user credentials.
         reply = get(f"https://api.jotform.com/form/" + # Generate URL
-                          f"{poll_id}/submissions?apiKey={app_key}")
+                          f"{poll_id}/submissions?apiKey={app_key}&limit=1000")
         # We now have form submissions with us.
         question_ids = get_question_ids(app_key, poll_id) # And the question IDs.
         try:
