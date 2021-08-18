@@ -1,3 +1,4 @@
+from requests.models import HTTPError
 from jfteams_proxy.jfutils import get_answer_stats, get_question_ids
 from typing import Union
 import uuid
@@ -38,10 +39,15 @@ def create_app() -> FastAPI:
         Register the User/Poll pair and assign them a UUID that can be
             used to identify them in subsequent requests.
         """
-        user_uuid = uuid4().hex  # Generate unique user ID.
+        app_key, poll_id = user_credentials.appKey, user_credentials.pollID
+        if possible_uuid := redis.get(f"{app_key}-{poll_id}"):
+            return {"uuid": possible_uuid} # If the user is already registered
+            # Do not re-register them.
+        user_uuid = uuid4().hex  # Otherwise, Generate a unique user ID.
         # Save user credentials.
-        redis.set(user_uuid, user_credentials.appKey +
-                  "-" + user_credentials.pollID)
+        redis.set(user_uuid, f"{app_key}-{poll_id}")
+        # We also set the reverse as we want to reuse the UUIDs. 
+        redis.set(f"{app_key}-{poll_id}", user_uuid)
         return {"uuid": user_uuid}
 
     @app.put("/poll/{uuid}/submissions")
@@ -55,7 +61,10 @@ def create_app() -> FastAPI:
             For more information on request and response formats,
             consider: https://api.jotform.com/docs/#put-form-id-submissions
         """
-        app_key, poll_id = redis.get(uuid).decode("utf-8").split("-")  # Get back our credentials.
+        credentials = redis.get(uuid)
+        if credentials is None:
+            raise HTTPError(401, "Unauthorised request")
+        app_key, poll_id = credentials.decode("utf-8").split("-")  # Get back our credentials.
         reply = put(f"https://api.jotform.com/form/" +
                           f"{poll_id}/submissions?apiKey={app_key}", 
                           json=submission)
@@ -73,7 +82,10 @@ def create_app() -> FastAPI:
             For more information on request and response formats,
             consider: https://api.jotform.com/docs/#form-id-questions
         """
-        app_key, poll_id = redis.get(uuid).decode("utf-8").split(
+        credentials = redis.get(uuid)
+        if credentials is None:
+            raise HTTPError(401, "Unauthorised request.")
+        app_key, poll_id = credentials.decode("utf-8").split(
             "-")  # Get back user credentials.
         reply = get(f"https://api.jotform.com/form/" + # Generate URL
                           f"{poll_id}/questions?apiKey={app_key}")
@@ -89,7 +101,10 @@ def create_app() -> FastAPI:
         Fetch all the answers from the JotForm API and convert them
             to cumilative statistics.
         """
-        app_key, poll_id = redis.get(uuid).decode("utf-8").split(
+        credentials = redis.get(uuid)
+        if credentials is None:
+            raise HTTPError(401, "Unauthorised request.")
+        app_key, poll_id = credentials.decode("utf-8").split(
             "-")  # Get back user credentials.
         reply = get(f"https://api.jotform.com/form/" + # Generate URL
                           f"{poll_id}/submissions?apiKey={app_key}")
