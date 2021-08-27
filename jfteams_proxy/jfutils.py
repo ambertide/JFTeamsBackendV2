@@ -68,7 +68,7 @@ def get_submissions(poll_id: str, app_key: str) -> list[dict]:
                 + f"?apiKey={app_key}"
                 + "&limit=1000"  # Each batch is at max 1000 long.
                 + f"&offset={offset}"  # Offset is from the last batch.
-                + '&{"status:ne":"DELETED"}')  # And ignored deleted, of course.
+                + '&filter={"status:ne":"DELETED"}')  # And ignored deleted, of course.
         try:
             json = reply.json()
         except:
