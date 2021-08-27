@@ -1,5 +1,5 @@
 from requests.models import HTTPError
-from jfteams_proxy.jfutils import get_answer_stats, get_question_ids
+from jfteams_proxy.jfutils import get_answer_stats, get_question_ids, get_submissions
 from typing import Union
 import uuid
 from fastapi import FastAPI, HTTPException
@@ -106,15 +106,10 @@ def create_app() -> FastAPI:
             raise HTTPError(401, "Unauthorised request.")
         app_key, poll_id = credentials.decode("utf-8").split(
             "-")  # Get back user credentials.
-        reply = get(f"https://api.jotform.com/form/" + # Generate URL
-                          f"{poll_id}/submissions?apiKey={app_key}&limit=1000")
+        submissions = get_submissions(poll_id, app_key)
         # We now have form submissions with us.
         question_ids = get_question_ids(app_key, poll_id) # And the question IDs.
-        try:
-            content = reply.json().get("content")
-        except:
-            raise HTTPException(404, "Poll not found.")
-        counts = jsonable_encoder(get_answer_stats(content, question_ids))
+        counts = jsonable_encoder(get_answer_stats(submissions, question_ids))
         return JSONResponse(counts)
 
     return app

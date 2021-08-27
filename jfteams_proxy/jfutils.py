@@ -1,4 +1,6 @@
 from typing import Counter, cast
+
+from fastapi.exceptions import HTTPException
 from .api_constants import base_url
 from requests import get
 from pprint import pprint
@@ -47,3 +49,33 @@ def get_answer_stats(submissions: list[dict], question_ids: list[str]) -> dict[s
                 question_answers[qid].extend(answer.get("answer", []))  
     # Now count each of the answers and return the tally.
     return {qid : Counter(answer for answer in question_answers[qid] if answer != None) for qid in question_answers}
+
+
+def get_submissions(poll_id: str, app_key: str) -> list[dict]:
+    """
+    Get all of the submissions of a poll with a given app key.
+    
+    :param poll_id: Form ID of the JotForm form.
+    :param app_key: Unique identifier of the user/app pair.
+    :return A list of submissions. 
+    :raise HTTPException if the poll is not found.
+    """
+    submissions = []
+    offset = 0
+    while True: # Until the content returns empty
+        reply = get(f"https://api.jotform.com/form/" # Generate URL
+                + f"{poll_id}/submissions" # And fetch a batch of submissions.
+                + f"?apiKey={app_key}"
+                + "&limit=1000"  # Each batch is at max 1000 long.
+                + f"&offset={offset}"  # Offset is from the last batch.
+                + '&{"status:ne":"DELETED"}')  # And ignored deleted, of course.
+        try:
+            json = reply.json()
+        except:
+            raise HTTPException(404, "Poll not found.")
+        fetched_submissions: list[dict] = json.get("content")  # Get the new submissions.
+        submissions.extend(fetched_submissions)  # Add them to main submissions.
+        if len(fetched_submissions) < 1000:  # If less than limit was fetched
+            break  # This was the last batch, so break.
+        offset += 1000  # Otherwise get ready to fetch the next batch.
+    return submissions  # Finally, return all of the submissions.
